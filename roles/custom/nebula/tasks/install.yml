@@ -1,0 +1,24 @@
+---
+- name: Import tasks - determine CA
+  ansible.builtin.import_tasks: determine_ca.yml
+  when: nebula_ca_host is not defined
+
+- name: Import tasks - determine real IP
+  ansible.builtin.import_tasks: determine_real_ip.yml
+  when: nebula_am_lighthouse and (nebula_routable_ip is not defined)
+
+- name: Import tasks - member preflight
+  ansible.builtin.import_tasks: member_preflight.yml
+  when: nebula_is_member
+
+- name: Import tasks - download
+  ansible.builtin.import_tasks: download.yml
+
+- name: Import tasks - CA
+  ansible.builtin.import_tasks: ca.yml
+  when: nebula_is_ca  
+
+
+- name: Import tasks - member
+  ansible.builtin.import_tasks: member.yml
+  when: nebula_is_member

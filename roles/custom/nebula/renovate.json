@@ -1,0 +1,22 @@
+{
+  "enabled": false,
+  "extends": [
+    "config:base",
+    "group:all",
+    ":automergeBranch",
+    ":automergeAll",
+    ":semanticCommitTypeAll(chore)"
+  ],
+  "regexManagers": [
+    {
+      "fileMatch": [
+        ".*"
+      ],
+      "matchStrings": [
+        "# renovate: depName=(?<depName>[^\\s]+)( datasource=(?<datasource>[^\\s]+))?( registryUrl=(?<registryUrl>\\S+))?\\n[^\\n]*?(?<currentValue>v?\\d+\\.\\d+\\.\\d+(-[\\S]+)?)"
+      ],
+      "datasourceTemplate": "{{#if datasource}}{{{datasource}}}{{else}}github-tags{{/if}}",
+      "versioningTemplate": "semver"
+    }
+  ]
+}

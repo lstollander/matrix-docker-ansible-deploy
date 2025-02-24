@@ -10,9 +10,9 @@
 - name: Check existence of matrix-mailer.service systemd service
   ansible.builtin.stat:
     path: "{{ devture_systemd_docker_base_systemd_path }}/matrix-mailer.service"
-  register: matrix_mailer_service_stat
+  register: exim_relay_service_stat
 
-- when: matrix_mailer_service_stat.stat.exists | bool
+- when: exim_relay_service_stat.stat.exists | bool
   block:
     - name: Ensure matrix-mailer.service systemd service is stopped
       ansible.builtin.systemd:

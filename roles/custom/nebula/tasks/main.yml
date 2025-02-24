@@ -1,0 +1,17 @@
+---
+- name: "Install Nebula"
+  tags:
+    - setup-all
+    - setup-nebula
+    - setup-lighthouse
+    - install-all
+    - install-nebula
+    - install-lighthouse
+  block:
+    - when: nebula_enabled | bool
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/validate_config.yml"
+
+    - when: nebula_enabled | bool
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/install.yml"
+
+

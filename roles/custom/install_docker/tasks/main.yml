@@ -1,0 +1,52 @@
+---
+# tasks file for roles/install_docker
+- name: Add Docker repository
+  get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+  tags:
+    - install-all
+    - docker 
+
+- name: Install Docker
+  yum:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      
+    state: present
+    update_cache: yes
+  tags:
+    - install-all
+    - docker 
+
+- name: Check if Docker Compose is already installed
+  stat:
+    path: /usr/local/bin/docker-compose
+  register: docker_compose
+  tags:
+    - install-all
+    - install
+    - docker 
+
+- name: Install Docker Compose
+  get_url:
+    url: "https://github.com/docker/compose/releases/download/{{version_docker_compose}}/docker-compose-linux-x86_64"
+    dest: /usr/local/bin/docker-compose
+    mode: '0755'
+  when: not docker_compose.stat.exists    
+  tags:
+    - install-all
+    - install    
+    - docker 
+
+- name: Ensure Docker is started and enabled
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+  tags:
+    - install-all
+    - install
+    - docker 

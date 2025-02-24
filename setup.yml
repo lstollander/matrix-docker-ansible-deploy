@@ -1,9 +1,11 @@
 ---
 - name: "Set up a Matrix server"
   hosts: "{{ target if target is defined else 'matrix_servers' }}"
+  vars_files:
+    - "{{ playbook_dir }}/group_vars/matrix_servers/vars.yml"
   become: true
-
   roles:
+    - role: custom/install_docker
     # Most of the roles below are not distributed with the playbook, but downloaded separately using `ansible-galaxy` via the `just roles` command (see `justfile`).
     - role: galaxy/playbook_help
       tags:
@@ -161,3 +163,128 @@
         - install-all
 
     - role: galaxy/playbook_runtime_messages
+
+
+- name: "Set up a Monada host"
+  hosts: "{{ target if target is defined else 'monada_host' }}"
+  vars_files:
+    - "{{ playbook_dir }}/group_vars/monada_host/vars.yml"
+  become: true
+  roles:
+    # - role: custom/install_docker
+    # Most of the roles below are not distributed with the playbook, but downloaded separately using `ansible-galaxy` via the `just roles` command (see `justfile`).
+    - role: galaxy/playbook_help
+      tags:
+        - setup-all
+        - install-all
+
+    - role: galaxy/systemd_docker_base
+
+      tags:
+        - setup-timesync
+        - setup-all
+        - install-timesync
+        - install-all
+
+    - role: custom/monada
+      when: monada_enabled | bool
+      tags:
+        - setup-monada
+        - setup-all
+        - install-monada
+        - install-all
+
+
+- name: "Generate certificates"
+  hosts: "{{ target if target is defined else 'nebula_node' }}"
+  become: true
+
+  vars_files:
+    - "{{ playbook_dir }}/group_vars/nebula_node/vars.yml"
+  tasks:
+  - name: Configurar autoridad certificadora
+    when: nebula.es_ac | default(false) | bool
+    tags:
+      - certificates
+    block:
+    - name: Crear directorio local
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/roles/custom/monada/files/nebula"
+        state: directory
+        mode: '0755'
+
+    - name: Sincronizar carpeta desde el host remoto al controlador
+      ansible.builtin.synchronize:
+        src: "/opt/nebula"
+        dest: "{{ playbook_dir }}/roles/custom/monada/files"
+        mode: pull
+      # delegate_to: localhost
+
+    - name: Verificar si el host es autoridad certificadora (CA)
+      ansible.builtin.debug:
+          msg: "Este host es una autoridad certificadora (CA) de Nebula"
+
+    - name: Comprobar si existe el certificado CA de Nebula
+      ansible.builtin.stat:
+          path: "{{ nebula.cert_path }}/ca.crt"
+      register: ca_cert_stat
+
+    - name: Generar certificado CA de Nebula si no existe
+      ansible.builtin.command:
+          cmd: "{{ nebula.bincert_path }} ca -name '{{ nebula.cert_name }}'"
+          chdir: /opt/nebula
+      when:
+        - ca_cert_stat.stat.exists == false
+
+  - name: Configurar host faro (Lighthouse) de Nebula
+    when: nebula.es_faro | default(false) | bool
+    tags:
+      - certificates
+    block:
+    - name: Comprobar si existe el certificado del lighhouse
+      ansible.builtin.stat:
+          path: "{{ nebula.cert_path }}/{{ inventory_hostname }}.crt"
+      delegate_to: "{{ nebula.hostname_es_ca }}"
+      register: ca_cert_faro_stat
+
+    - name: Generar certificado lighhouse de Nebula si no existe
+      ansible.builtin.command:
+          cmd: '{{ nebula.bincert_path }} sign -name "{{ inventory_hostname }}" -ip "{{ nebula.ip_faro }}/24" -groups "lighthouses"'
+          chdir: /opt/nebula
+      when:
+        - ca_cert_faro_stat.stat.exists == false
+      delegate_to: "{{ nebula.hostname_es_ca }}"
+
+  - name: Configurar host común de Nebula
+    when: not nebula.es_faro | default(false) | bool
+    tags:
+      - certificates
+    block:
+      - name: Comprobar si existe el certificado del node
+        ansible.builtin.stat:
+            path: "{{ nebula.cert_path }}/{{ inventory_hostname }}.crt"
+        register: ca_cert_nodo_stat
+        delegate_to: "{{ nebula.hostname_es_ca }}"
+
+      - name: Generar certificado si no existe
+        ansible.builtin.command:
+            cmd: '{{ nebula.bincert_path }} sign -name "{{ inventory_hostname }}" -ip "{{ nebula.ip_node }}/24" -groups "nebula"'
+            chdir: /opt/nebula
+        when:
+          - ca_cert_nodo_stat.stat.exists == false
+        delegate_to: "{{ nebula.hostname_es_ca }}"
+
+
+- name: "Set up a NEBULA host"
+  hosts: "{{ target if target is defined else 'nebula_node' }}"
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/group_vars/nebula_node/vars.yml"
+  roles:
+    - role: custom/nebula
+      when: nebula_enabled | bool
+      tags:
+        - setup-nebula
+        - setup-all
+        - install-nebula
+        - install-all
